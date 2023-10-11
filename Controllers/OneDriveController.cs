@@ -1,9 +1,5 @@
-using Azure;
-using Azure.Identity;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Graph;
-using Microsoft.Graph.Models;
-using Microsoft.OneDrive.Sdk;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net;
@@ -43,7 +39,7 @@ namespace OneDriveDownloaded.Controllers
         /// <returns>GetDownloadLinkOfFileHttpResponse</returns>
         [Route("01-GetDownloadLinkOfFile")]
         [HttpPost]
-        public async Task<GetDownloadLinkOfFileHttpResponse> Get01DownloadLinkOfFile([FromBody] GetDownloadLinkOfFileHttpReq req, [FromHeader] string authorization)
+        public async Task<GetHttpResponse> Get01DownloadLinkOfFile([FromBody] GetDownloadLinkOfFileHttpReq req, [FromHeader] string authorization)
         {
             //add header
             var headerValues = new Dictionary<string, string>();
@@ -52,20 +48,34 @@ namespace OneDriveDownloaded.Controllers
             // '/drive/root:/path/to/file' -> OneDrive REST API: Access a driveItem by path under the root.
             // example of file 'from_d/r/a.rar'
             var url5 = Path.Combine(ROOT_ADDRESS, DRIVE_ROOT_PATH, req.Path, req.FileName);
-            if(!req.ShowAllFields)
+            if (!req.ShowAllFields)
             {
                 url5 = Path.Combine(url5, LIST_OF_FIELD_TO_BE_READ);
             }
             var response5 = await _httpService.GetAsync(url5, headerValues);
 
-            var response = new GetDownloadLinkOfFileHttpResponse
-            {
-                DownloadUrl = GetDownloadUrl(response5),
-                FileName = GetValueForField(response5, "name"),
-                PathToFolder = req.Path,
-            };
+            var response = new GetHttpResponse();
 
-            return response;
+            bool isSuccess = CheckIfIsSuccess(response5);
+            if (isSuccess)
+            {
+                response.Content = new GetDownloadLinkOfFileHttpResponse
+                {
+                    DownloadUrl = GetDownloadUrl(response5),
+                    FileName = GetValueForField(response5, "name"),
+                    PathToFolder = req.Path,
+                };
+                return response;
+            }
+
+            var err = JsonConvert.DeserializeObject<GetHttpResponse>(response5);
+            return err;
+        }
+
+        private bool CheckIfIsSuccess(string httpResponse)
+        {
+            JObject fileInfo = JObject.Parse(httpResponse);
+            return fileInfo["@odata.context"] is not null;
         }
 
         private string GetDownloadUrl(string httpResponse)
@@ -124,6 +134,12 @@ namespace OneDriveDownloaded.Controllers
         }
     }
     
+    public class GetHttpResponse
+    {
+        public GetDownloadLinkOfFileHttpResponse Content { get; set; }
+        public GetDownloadLinkOfFileHttpError Error { get; set; }
+    }
+
     public class GetDownloadLinkOfFileHttpResponse
     {
         public string DownloadUrl { get; set; }
@@ -136,5 +152,22 @@ namespace OneDriveDownloaded.Controllers
         public string FileName { get; set;}
         public string Path { get; set; }
         public bool ShowAllFields { get; set; }
+    }
+
+    public class GetDownloadLinkOfFileHttpError
+    {
+        public string Code { get; set; }
+        public string Message { get; set; }
+        public GetDownloadLinkOfFileHttpInnerError InnerError { get; set; }
+    }
+    public class GetDownloadLinkOfFileHttpInnerError
+    {
+        public string date { get; set; }
+
+        [JsonProperty("request-id")]
+        public string RequestId { get; set; }
+
+        [JsonProperty("client-request-id")]
+        public string ClientRequestId { get; set; }
     }
 }
