@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.ComponentModel.Design;
 using System.Net;
 using System.Text;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 
-namespace OneDriveDownloaded.Controllers
+namespace OneDriveBackend.Controllers
 {
     [ApiController]
     [Route("[controller]")]
@@ -17,12 +20,12 @@ namespace OneDriveDownloaded.Controllers
         private const string LIST_OF_FIELD_TO_BE_READ = "?select=@microsoft.graph.downloadUrl,name";
 
         private readonly ILogger<OneDriveController> _logger;
-        private readonly HttpService _httpService;
+        private readonly IHttpService _httpService;
 
-        public OneDriveController(ILogger<OneDriveController> logger)
+        public OneDriveController(ILogger<OneDriveController> logger, IHttpService httpService)
         {
             _logger = logger;
-            _httpService = new HttpService();
+            _httpService = httpService;
         }
 
         /// <summary>
@@ -90,11 +93,17 @@ namespace OneDriveDownloaded.Controllers
         }
     }
 
-    public class HttpService
+    public interface IHttpService
+    {
+        Task<string> GetAsync(string uri, Dictionary<string, string> headerValues = null);
+        Task<string> PostAsync(string uri, string data, string contentType);
+    }
+    public class HttpService : IHttpService
     {
         private readonly HttpClient _client;
+        private bool _isLocal;
 
-        public HttpService()
+        public HttpService(IWebHostEnvironment environment)
         {
             HttpClientHandler handler = new HttpClientHandler
             {
@@ -102,10 +111,16 @@ namespace OneDriveDownloaded.Controllers
             };
 
             _client = new HttpClient();
+            _isLocal = environment.IsDevelopment();
         }
 
         public async Task<string> GetAsync(string uri, Dictionary<string, string> headerValues = null)
         {
+            if(_isLocal)
+            {
+                return await GetAsyncLocal(uri);
+            }
+
             if(headerValues is not null)
             {
                 foreach (var headerVal in headerValues)
@@ -131,6 +146,18 @@ namespace OneDriveDownloaded.Controllers
 
             using HttpResponseMessage response = await _client.SendAsync(requestMessage);
             return await response.Content.ReadAsStringAsync();
+        }
+
+        private Task<string> GetAsyncLocal(string uri)
+        {
+            //test
+            var error = "{\"error\":{\"code\":\"InvalidAuthenticationToken\",\"message\":\"CompactToken parsing failed with error code: 80049217\",\"innerError\":{\"date\":\"2023-10-11T14:16:36\",\"request-id\":\"ad1110b0-cc67-47f1-99ae-c1ddcad4ea3e\",\"client-request-id\":\"ad1110b0-cc67-47f1-99ae-c1ddcad4ea3e\"}}}";
+            var success = "{\"@odata.context\":\"https://graph.microsoft.com/v1.0/$metadata#users('7c4cf661-71cd-4efe-a507-989232c71451')/drive/root/$entity\",\"@microsoft.graph.downloadUrl\":\"https://levi9-my.sharepoint.com/personal/r_gherman_levi9_com/_layouts/15/download.aspx?UniqueId=c361056b-b70b-4fe6-b14a-458d287c6550&Translate=false&tempauth=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIwMDAwMDAwMy0wMDAwLTBmZjEtY2UwMC0wMDAwMDAwMDAwMDAvbGV2aTktbXkuc2hhcmVwb2ludC5jb21ANDA3NTg0ODEtNzM2NS00NDJjLWFlOTQtNTYzZWQxNjA2MjE4IiwiaXNzIjoiMDAwMDAwMDMtMDAwMC0wZmYxLWNlMDAtMDAwMDAwMDAwMDAwIiwibmJmIjoiMTY5NzAzMzgzOSIsImV4cCI6IjE2OTcwMzc0MzkiLCJlbmRwb2ludHVybCI6IjNQZCtoQThSQmVtMm5MYVV4VkoyTjlFN1JCQXhldTQxaDJ3NTQxSnlGM1U9IiwiZW5kcG9pbnR1cmxMZW5ndGgiOiIxNDgiLCJpc2xvb3BiYWNrIjoiVHJ1ZSIsImNpZCI6IjNmeWt4SUhSZFVDUWxXdWVnSHVibHc9PSIsInZlciI6Imhhc2hlZHByb29mdG9rZW4iLCJzaXRlaWQiOiJPV0ppTVdaa01EZ3RNREEwTVMwME4yRTVMVGsyTUdJdE1UbGhNVEppTlRneU16Tm0iLCJhcHBfZGlzcGxheW5hbWUiOiJHcmFwaCBFeHBsb3JlciIsImdpdmVuX25hbWUiOiJSYXp2YW4iLCJmYW1pbHlfbmFtZSI6IkdoZXJtYW4iLCJzaWduaW5fc3RhdGUiOiJbXCJrbXNpXCJdIiwiYXBwaWQiOiJkZThiYzhiNS1kOWY5LTQ4YjEtYThhZC1iNzQ4ZGE3MjUwNjQiLCJ0aWQiOiI0MDc1ODQ4MS03MzY1LTQ0MmMtYWU5NC01NjNlZDE2MDYyMTgiLCJ1cG4iOiJyLmdoZXJtYW5AbGV2aTkuY29tIiwicHVpZCI6IjEwMDMwMDAwQTdBMEMzNDAiLCJjYWNoZWtleSI6IjBoLmZ8bWVtYmVyc2hpcHwxMDAzMDAwMGE3YTBjMzQwQGxpdmUuY29tIiwic2NwIjoibXlmaWxlcy5yZWFkIGFsbHByb2ZpbGVzLnJlYWQiLCJ0dCI6IjIiLCJpcGFkZHIiOiIyMC4xOTAuMTYwLjI2In0.HKb4_2kqVqm6YrgK-MtDFy8q61wGSdtjXEi7TMZ1TOU&ApiVersion=2.0\",\"name\":\"a.rar\"}";
+            //bool isSuccess3 = CheckIfIsSuccess(error);
+            //bool isSuccess2 = CheckIfIsSuccess(success);
+            //end-test
+
+            throw new NotImplementedException();
         }
     }
     

@@ -1,6 +1,9 @@
+using OneDriveBackend.Controllers;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+AddApplicationServices();
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -21,3 +24,8 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+void AddApplicationServices()
+{
+    builder.Services.AddTransient<IHttpService, HttpService>();
+}
