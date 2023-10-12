@@ -1,21 +1,25 @@
 # OneDrive-REST-API
 
-Endpoint:
-POST
+## Endpoint:
+**POST**
 '/OneDrive/01-GetDownloadLinkOfFile'
 
-Heard Authorization: token bearer
+## Header Authorization: 
+Token bearer
 
-Payload model (model name 'GetDownloadLinkOfFileHttpReq'):
+## Payload model ('GetDownloadLinkOfFileHttpReq'):
+```json
 {
   "fileName": "string",
   "path": "string",
-  "showAllFields": true
+  "showAllFields": false/true
 }
+```
 
-Response model: (model name 'GetHttpResponse')
+## Response model: ('GetHttpResponse')
+```json
 {
-  "mockData": true,
+  "mockData": false/true,
   "content": {
     "downloadUrl": "string",
     "fileName": "string",
@@ -31,9 +35,16 @@ Response model: (model name 'GetHttpResponse')
     }
   }
 }
+```
 
-Short description of endpoint:
+## Short description of endpoint:
 - This endpoint makes a call to OneDrive REST API endpoint '/drive/root:/path/to/file'.
 - Giving a filename and a path, endpoint will return download url for that file.
+- 'mockData' from response, is true if environment variable is **'Development'** (ASPNETCORE_ENVIRONMENT)
 
-END.
+## Docs:
+- https://learn.microsoft.com/en-us/graph/api/resources/onedrive?view=graph-rest-1.0
+- https://developer.microsoft.com/en-us/graph/graph-explorer
+
+
+# Thank you!
